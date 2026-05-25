@@ -6,3 +6,6 @@ pandas
 numpy
 joblib
 regex
+transformers
+torch
+safetensors
