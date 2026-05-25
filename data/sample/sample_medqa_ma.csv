@@ -1,0 +1,26 @@
+id,text,language,specialty,urgency,symptoms,source
+triage_000000,العلاج ديال الحساسية من السمك,arabic_darija,Allergy and Immunology,unknown,,medqa_ma
+triage_000001,عندي حساسية من القصاصات، ما يمكنش نستعملو,arabic_darija,Allergy and Immunology,unknown,,medqa_ma
+triage_000002,واش حبوب زهرة الربيع كتحبس الحمل,arabic_darija,Allergy and Immunology,unknown,skin_rash,medqa_ma
+triage_000003,واش كاين شي علاج لضيق التنفس؟,arabic_darija,Allergy and Immunology,unknown,,medqa_ma
+triage_000004,علاج للاكريما,arabic_darija,Allergy and Immunology,unknown,,medqa_ma
+triage_000005,علاج الحساسية من التمر والحليب والموز,arabic_darija,Allergy and Immunology,unknown,,medqa_ma
+triage_000006,ايهما احسن لعلاج الحساسية، الاتاراكس ولا الكريزال؟,arabic_darija,Allergy and Immunology,unknown,,medqa_ma
+triage_000007,كيفاش كاتعافا من الحساسية والتهاب الانف,arabic_darija,Allergy and Immunology,unknown,,medqa_ma
+triage_000008,شنو غادي ندير الا كان عندي حساسية من الصبغة؟,arabic_darija,Allergy and Immunology,unknown,,medqa_ma
+triage_000009,بغيت شي دوا ديال الحساسية,arabic_darija,Allergy and Immunology,unknown,,medqa_ma
+triage_000010,اسباب كح كيدي,arabic_darija,Allergy and Immunology,unknown,,medqa_ma
+triage_000011,شنو هو دواء حساسية الشري؟,arabic_darija,Allergy and Immunology,unknown,,medqa_ma
+triage_000012,واش البنسلين كايسبب التهاب المعدة عند الدراري,arabic_darija,Allergy and Immunology,unknown,,medqa_ma
+triage_000013,ههههه راه واجد، حسان بزاف و كيعييني دوار,arabic_darija,Allergy and Immunology,unknown,,medqa_ma
+triage_000014,شنو هوما الفواكه اللي ممكن نتجنبوها في حالة الحساسية؟,arabic_darija,Allergy and Immunology,unknown,,medqa_ma
+triage_000015,شنو هو الفرق بين الحساسية والربو؟,arabic_darija,Allergy and Immunology,unknown,,medqa_ma
+triage_000016,واش فيكسيفينادين فعال فالعلاج ديال الارتكاريا ولا كيف ما كيتسما الشرا,arabic_darija,Allergy and Immunology,unknown,,medqa_ma
+triage_000017,واش كاين علاج للحساسية ديال النعمة؟,arabic_darija,Allergy and Immunology,unknown,,medqa_ma
+triage_000018,الماكلة ديال الحوت والزريعة فيها لعيب,arabic_darija,Allergy and Immunology,unknown,,medqa_ma
+triage_000019,شنو هو علاج الحساسية؟,arabic_darija,Allergy and Immunology,unknown,,medqa_ma
+triage_000020,عندي وجع فالعينين فالصباح وكنحس بحال الا كيحرقوني. شنو ممكن يكون السبب؟,arabic_darija,Allergy and Immunology,unknown,,medqa_ma
+triage_000021,واش كاين شي عجلات انفية و صدرية؟,arabic_darija,Allergy and Immunology,unknown,,medqa_ma
+triage_000022,واش ممكن تقول لي شكون هاد اشيل اللي اثر فيه السلفا؟,arabic_darija,Allergy and Immunology,unknown,,medqa_ma
+triage_000023,عندي حاساسيا من لبسكويت,arabic_darija,Allergy and Immunology,unknown,,medqa_ma
+triage_000024,واش الادوية ديال الحساسية كتاثر علي التزامن,arabic_darija,Allergy and Immunology,unknown,,medqa_ma
