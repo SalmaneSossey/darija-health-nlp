@@ -145,6 +145,10 @@ For Colab, use:
 notebooks/07_transformer_comparison.ipynb
 ```
 
+Open directly in the browser:
+
+[Open 07 Transformer Comparison in Colab](https://colab.research.google.com/github/SalmaneSossey/darija-health-nlp/blob/main/notebooks/07_transformer_comparison.ipynb)
+
 Colab runs on a remote VM and cannot access local WSL files. The notebook can clone this GitHub repository automatically, but you must still provide data because raw data, processed data, models, and artifacts are intentionally ignored by Git. The easiest option is to upload or copy:
 
 ```text
