@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
+from inspect import signature
 from argparse import ArgumentParser
 from pathlib import Path
 
@@ -124,15 +125,21 @@ def train_transformer(
             "macro_recall": recall_score(labels, predictions, average="macro", zero_division=0),
         }
 
-    trainer = Trainer(
-        model=model,
-        args=args,
-        train_dataset=train_dataset,
-        eval_dataset=valid_dataset,
-        tokenizer=tokenizer,
-        data_collator=DataCollatorWithPadding(tokenizer=tokenizer),
-        compute_metrics=compute_metrics,
-    )
+    trainer_kwargs = {
+        "model": model,
+        "args": args,
+        "train_dataset": train_dataset,
+        "eval_dataset": valid_dataset,
+        "data_collator": DataCollatorWithPadding(tokenizer=tokenizer),
+        "compute_metrics": compute_metrics,
+    }
+    trainer_parameters = signature(Trainer.__init__).parameters
+    if "processing_class" in trainer_parameters:
+        trainer_kwargs["processing_class"] = tokenizer
+    elif "tokenizer" in trainer_parameters:
+        trainer_kwargs["tokenizer"] = tokenizer
+
+    trainer = Trainer(**trainer_kwargs)
     trainer.train()
     metrics = trainer.evaluate(test_dataset)
     trainer.save_model(str(output_dir))
