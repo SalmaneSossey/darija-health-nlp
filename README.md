@@ -139,6 +139,34 @@ python src/models/train_transformer_specialty_classifier.py --model arabert
 python src/models/train_transformer_specialty_classifier.py --model mbert
 ```
 
+For Colab, use:
+
+```text
+notebooks/07_transformer_comparison.ipynb
+```
+
+Colab runs on a remote VM and cannot access local WSL files. The notebook can clone this GitHub repository automatically, but you must still provide data because raw data, processed data, models, and artifacts are intentionally ignored by Git. The easiest option is to upload or copy:
+
+```text
+data/processed/train.csv
+data/processed/valid.csv
+data/processed/test.csv
+```
+
+into the Colab repo before starting transformer training. To make upload easier, create a Colab-ready zip locally:
+
+```bash
+python src/data/export_colab_training_data.py
+```
+
+Then upload this file in the transformer notebook:
+
+```text
+artifacts/colab/darija_health_processed_splits.zip
+```
+
+The notebook extracts it into `data/processed/`. Alternatively, upload the raw MedQA-MA dataset to `data/raw/medqa_ma/` in Colab and rerun the preprocessing pipeline.
+
 Transformer dependencies are intentionally not included in the backend or frontend Docker images.
 
 ## Evaluation
@@ -245,12 +273,13 @@ Use the notebooks in order:
 4. `04_train_specialty_classifier.ipynb`
 5. `05_urgency_rules_and_symptom_extraction.ipynb`
 6. `06_evaluation_and_error_analysis.ipynb`
+7. `07_transformer_comparison.ipynb`
 
 Each notebook calls reusable code from `src/` or `backend/`.
 
 ## Limitations
 
-- The specialty model is a classical TF-IDF baseline, not a transformer.
+- The deployed specialty model is a classical TF-IDF baseline; transformer comparison is available as an optional Colab experiment.
 - Urgency is rule-based and conservative.
 - Symptom extraction is dictionary-based and incomplete.
 - MedQA-MA contains vague, noisy, and assistant-like rows.
