@@ -39,9 +39,10 @@ class SpecialtyModel:
     def load(self) -> None:
         if self.transformer_path.exists() and pipeline is not None:
             import logging
-            logging.info(f"Loading MARBERT Transformer model from {self.transformer_path}")
+            logging.info(f"Loading MARBERT Transformer model from {self.transformer_path} on CPU")
             # Ensure it works in newer versions of transformers depending on the return defaults
-            self.model = pipeline("text-classification", model=str(self.transformer_path), top_k=1)
+            # device=-1 explicitly forces CPU evaluation
+            self.model = pipeline("text-classification", model=str(self.transformer_path), top_k=1, device=-1)
             self.is_transformer = True
         elif self.joblib_model_path.exists():
             import logging
