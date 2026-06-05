@@ -10,7 +10,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.append(str(PROJECT_ROOT))
 
-from src.utils.paths import RAW_DATA_DIR, ensure_project_dirs
+from src.utils.paths import RAW_DATA_DIR, DATA_DIR, ensure_project_dirs
 
 
 LIKELY_COLUMNS = {
@@ -60,7 +60,7 @@ def load_preview(path: Path) -> pd.DataFrame | None:
         if file_type == "text":
             lines = path.read_text(encoding="utf-8", errors="replace").splitlines()[:5]
             return pd.DataFrame({"line": lines})
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         print(f"  Could not load preview: {exc}")
     return None
 
@@ -69,12 +69,22 @@ def inspect_dataset(raw_dir: Path = RAW_DATA_DIR) -> None:
     ensure_project_dirs()
     print(f"Raw data directory: {raw_dir}")
     if not raw_dir.exists():
-        print("Raw data directory does not exist.")
-        return
+        alternative = next(DATA_DIR.glob("MedQA-MA*"), None)
+        if alternative and alternative.exists():
+            raw_dir = alternative
+            print(f"Using alternative raw data directory: {raw_dir}")
+        else:
+            print("Raw data directory does not exist.")
+            return
 
-    files = sorted(path for path in raw_dir.rglob("*") if path.is_file())
+    files = sorted(
+        path
+        for path in raw_dir.rglob("*")
+        if path.is_file()
+        and path.suffix.lower() in {".csv", ".tsv", ".json", ".xlsx", ".xls", ".txt"}
+    )
     if not files:
-        print("No files found.")
+        print("No indexable files found.")
         return
 
     for path in files:
@@ -92,7 +102,9 @@ def inspect_dataset(raw_dir: Path = RAW_DATA_DIR) -> None:
             continue
 
         print(f"Columns: {list(preview.columns)}")
-        likely = [col for col in preview.columns if str(col).strip().lower() in LIKELY_COLUMNS]
+        likely = [
+            col for col in preview.columns if str(col).strip().lower() in LIKELY_COLUMNS
+        ]
         print(f"Likely useful columns: {likely or 'none detected'}")
         print("Preview:")
         print(preview.head().to_string(index=False))
