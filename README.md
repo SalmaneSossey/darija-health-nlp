@@ -21,17 +21,21 @@ Moroccan patients often describe symptoms in Moroccan Darija, Latin-script Arabi
 - Dictionary-based symptom extraction.
 - Rule-based urgency orientation.
 - FastAPI backend and Streamlit frontend.
+- Optional native Rust inference engine (PyO3) for the classical SVM, with transparent joblib fallback.
 - Docker Compose for local deployment.
 
 ## Architecture
 
 ```text
-data/raw/medqa_ma -> EDA -> data/processed -> TF-IDF classifier
-                                      -> FastAPI /predict
+data/raw/medqa_ma -> EDA -> data/processed -> TF-IDF classifier (joblib)
+                                              |  -> export_svm_to_rust.py
+                                              |       -> models/svm_weights.json
+                                              |       -> rust_inference (PyO3, cdylib)
+                                      -> FastAPI /predict  (Transformer -> Rust SVM -> joblib)
                                       -> Streamlit UI
 ```
 
-Reusable data, feature, and model code lives in `src/`. Application code lives in `backend/` and `frontend/`. Generated data, models, and artifacts are ignored by Git.
+Reusable data, feature, and model code lives in `src/`. The native Rust inference engine lives in `rust_inference/` (compiled as a Python extension via PyO3). Application code lives in `backend/` and `frontend/`. Generated data, models, and artifacts are ignored by Git.
 
 ## Dataset
 
@@ -221,6 +225,90 @@ Key artifacts:
 - `artifacts/figures/v2_normalized_confusion_matrix.png`
 - `artifacts/figures/v2_top_confusions.png`
 - `artifacts/figures/v2_language_error_rates.png`
+
+## V3: native Rust inference engine (PyO3)
+
+The V2 classical SVM is exported to a flat JSON weight file and re-implemented in Rust as a PyO3 extension module (`rust_inference/`). The backend loads it transparently, eliminating the scikit-learn import on the inference path.
+
+### Three-tier fallback pipeline
+
+The backend picks the highest-priority backend that is available at startup:
+
+- **Tier 1 — Transformer (MARBERT):** loaded when `models/transformer_MARBERT_specialty/` exists and `transformers` is importable.
+- **Tier 2 — Native Rust SVM:** loaded when the compiled `rust_inference` extension is importable and `models/svm_weights.json` exists. No `scikit-learn` is loaded at runtime.
+- **Tier 3 — Joblib scikit-learn:** loaded only if neither Tier 1 nor Tier 2 is available.
+
+### Build the Rust extension
+
+```bash
+python -m pip install maturin
+cd rust_inference
+maturin develop --release
+```
+
+Requires a Rust toolchain (`cargo`, `rustc`) and a Python version supported by the pinned PyO3 (this project uses Python 3.13 and PyO3 0.22).
+
+### Export the V2 weights to JSON
+
+```bash
+python src/models/export_svm_to_rust.py
+```
+
+Output:
+
+- `models/svm_weights.json` (vocabulary, IDF, class list, weight matrix, intercepts)
+
+### V3 results
+
+The Rust engine re-implements the V2 `char_wb` TF-IDF + LinearSVC pipeline: `char_wb` 3-5 n-gram extraction, L2 normalization, and multiclass LinearSVC argmax. Re-implementation parity with scikit-learn is exact.
+
+#### Held-out test set (n = 9965, 25 classes)
+
+All three backends scored on the same split (`data/processed/test.csv`).
+
+| Backend                       | Accuracy | Macro F1 | Weighted F1 | Macro Precision | Macro Recall | µs / call |
+| ----------------------------- | -------- | -------- | ----------- | --------------- | ------------ | --------- |
+| **MARBERT** (Transformer, CPU fp32) | `0.6845` | `0.6755` | `0.6836`    | `0.6822`        | `0.6781`     | `21 609.5` |
+| **Rust SVM** (PyO3, native)         | `0.6492` | `0.6255` | `0.6442`    | `0.6178`        | `0.6396`     | `21.8`     |
+| **sklearn LinearSVC** (joblib)      | `0.6492` | `0.6255` | `0.6442`    | `0.6178`        | `0.6396`     | `62.4`     |
+
+The full per-class report, confusion matrix, and combined metrics are in `artifacts/metrics/comparison_all_tiers.json` and `artifacts/metrics/specialty_metrics.json`.
+
+#### Accuracy vs latency trade-off
+
+```
+Macro F1
+  0.68 |                          * MARBERT
+  0.67 |
+  0.66 |
+  0.65 |
+  0.64 |
+  0.63 |
+  0.62 |  * Rust SVM
+  0.62 |  * sklearn LinearSVC
+       +--------------------------------------------
+         0      20k      40k      60k     µs / call
+```
+
+MARBERT buys +5.0 pp macro-F1 (and +3.5 pp accuracy) over the classical SVM, at roughly **1000× the per-call latency on CPU**. For a latency-sensitive deployment, the Rust SVM tier is the default; the transformer is a Tier-1 opt-in for high-accuracy offline scoring.
+
+#### Agreement and determinism
+
+- Rust vs sklearn agreement on the full test set: **9965 / 9965 (100.00%)** — predictions, scores, and argmax indices are bit-identical to the scikit-learn pipeline.
+- Per-call latency (isolated micro-benchmark, single warm input):
+
+  | Backend       | Latency   | Speedup |
+  | ------------- | --------- | ------- |
+  | scikit-learn  | `347.3 µs` | 1.0×   |
+  | Rust (PyO3)   | `6.7 µs`   | `51.8×` |
+
+  The 51.8× number is the most relevant figure for a request-driven FastAPI service: each `/predict` call hits a warm Rust object. Full-batch (n = 9965) throughput speedup is `2.9×` because Python list-comprehension overhead and tokenizer step-up dominate the batch loop, not the kernel.
+
+Notes:
+
+- MARBERT timing above is a CPU re-run (PyTorch fp32). The training-time figure captured in `artifacts/metrics/transformer_MARBERT_local_specialty_metrics.json` (`eval_runtime: 24.6 s`, `404.6 samples/s`) was measured on the same GPU/FP16 configuration the model was trained on; accuracy and F1 are identical between the two runs (`0.6845` / `0.6755`).
+- The JSON weight file is ~80 MB; for production a binary format (`bincode` or raw `f32` little-endian) would cut load time and disk footprint significantly.
+- Transformer dependencies are still intentionally not part of the Rust extension; the optional MARBERT path remains an opt-in.
 
 ## Backend
 

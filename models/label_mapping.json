@@ -1,0 +1,32 @@
+{
+  "labels": [
+    "Allergy and Immunology",
+    "Anesthesiology",
+    "Cardiology",
+    "Cosmetic Dermatology",
+    "Dentistry",
+    "Dermatology",
+    "Dietetics and Nutrition",
+    "Emergency Medicine",
+    "Endocrinology",
+    "Gastroenterology",
+    "General Practice",
+    "Hematology",
+    "Infectious Diseases",
+    "Internal Medicine",
+    "Mental Health",
+    "Neurology",
+    "Obstetrics and Gynecology",
+    "Oncology",
+    "Ophthalmology",
+    "Otorhinolaryngology",
+    "Pediatric Medicine",
+    "Psychiatry",
+    "Pulmonology",
+    "Rheumatology and Orthopedics",
+    "general practitioner"
+  ],
+  "best_model": "char_wb_tfidf_linear_svm",
+  "label_mode": "specialty",
+  "min_class_count": 50
+}
