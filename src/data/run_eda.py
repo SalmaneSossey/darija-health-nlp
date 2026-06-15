@@ -14,7 +14,13 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.append(str(PROJECT_ROOT))
 
 from src.features.text_normalization import has_arabic, has_latin, normalize_text
-from src.utils.paths import FIGURES_DIR, RAW_DATA_DIR, REPORTS_DIR, ensure_project_dirs
+from src.utils.paths import (
+    FIGURES_DIR,
+    RAW_DATA_DIR,
+    DATA_DIR,
+    REPORTS_DIR,
+    ensure_project_dirs,
+)
 
 
 MASTER_FILE = RAW_DATA_DIR / "Dataset" / "MedQA_Ma dataset" / "MedQA_MA.csv"
@@ -51,10 +57,27 @@ LATIN_DARIJA_TOKENS = {
 def find_main_dataset() -> Path:
     if MASTER_FILE.exists():
         return MASTER_FILE
-    csv_files = sorted(RAW_DATA_DIR.rglob("*.csv"), key=lambda path: path.stat().st_size, reverse=True)
-    if not csv_files:
-        raise FileNotFoundError(f"No CSV files found under {RAW_DATA_DIR}")
-    return csv_files[0]
+
+    for path in DATA_DIR.rglob("*"):
+        if path.is_file() and path.name.lower() in (
+            "medqa_ma.csv",
+            "medqa_ma_processed.csv",
+        ):
+            return path
+
+    csv_files = []
+    if RAW_DATA_DIR.exists():
+        csv_files.extend(RAW_DATA_DIR.rglob("*.csv"))
+    for folder in DATA_DIR.glob("MedQA-MA*"):
+        csv_files.extend(folder.rglob("*.csv"))
+
+    if csv_files:
+        csv_files = sorted(csv_files, key=lambda p: p.stat().st_size, reverse=True)
+        return csv_files[0]
+
+    raise FileNotFoundError(
+        f"Could not locate the main MedQA-MA CSV file in {DATA_DIR}"
+    )
 
 
 def detect_language(text: object) -> str:
@@ -65,7 +88,9 @@ def detect_language(text: object) -> str:
     latin = has_latin(normalized)
     tokens = set(re.findall(r"[\wÀ-ÿ]+", normalized.lower()))
     has_french = bool(tokens & FRENCH_WORDS)
-    has_darija_latin = bool(tokens & LATIN_DARIJA_TOKENS) or bool(re.search(r"[379]", normalized))
+    has_darija_latin = bool(tokens & LATIN_DARIJA_TOKENS) or bool(
+        re.search(r"[379]", normalized)
+    )
     if arabic and latin:
         return "mixed"
     if arabic:
@@ -98,13 +123,24 @@ def useful_columns(df: pd.DataFrame) -> tuple[str, str | None]:
         or lowered.get("question_darija_processed")
         or lowered.get("text")
     )
-    label_col = lowered.get("category") or lowered.get("specialty") or lowered.get("label")
+    label_col = (
+        lowered.get("category") or lowered.get("specialty") or lowered.get("label")
+    )
     if not text_col:
-        raise ValueError(f"Could not identify a question/text column from {list(df.columns)}")
+        raise ValueError(
+            f"Could not identify a question/text column from {list(df.columns)}"
+        )
     return text_col, label_col
 
 
-def save_bar(series: pd.Series, title: str, xlabel: str, ylabel: str, path: Path, top_n: int | None = None) -> None:
+def save_bar(
+    series: pd.Series,
+    title: str,
+    xlabel: str,
+    ylabel: str,
+    path: Path,
+    top_n: int | None = None,
+) -> None:
     values = series.head(top_n) if top_n else series
     plt.figure(figsize=(12, max(5, min(12, len(values) * 0.35))))
     plt.barh([str(index) for index in values.index], values.values)
@@ -135,7 +171,11 @@ def run_eda() -> dict[str, object]:
     empty_questions = int((working["normalized_text"] == "").sum())
     empty_labels = int(working[label_col].isna().sum()) if label_col else 0
 
-    label_counts = working[label_col].fillna("unknown").astype(str).str.strip().value_counts() if label_col else pd.Series(dtype=int)
+    label_counts = (
+        working[label_col].fillna("unknown").astype(str).str.strip().value_counts()
+        if label_col
+        else pd.Series(dtype=int)
+    )
     language_counts = working["language"].value_counts()
     rare_classes = label_counts[label_counts < 50]
 
@@ -144,12 +184,21 @@ def run_eda() -> dict[str, object]:
     for text in working["normalized_text"]:
         tokens = re.findall(r"[\wÀ-ÿ\u0600-\u06FF]+", text)
         token_counter.update(token for token in tokens if len(token) > 1)
-        arabic_token_counter.update(token for token in tokens if has_arabic(token) and len(token) > 1)
+        arabic_token_counter.update(
+            token for token in tokens if has_arabic(token) and len(token) > 1
+        )
 
     top_tokens = pd.Series(dict(token_counter.most_common(30)))
     top_arabic_tokens = pd.Series(dict(arabic_token_counter.most_common(30)))
 
-    save_bar(label_counts, "Class Distribution", "Rows", "Specialty", FIGURES_DIR / "class_distribution.png", top_n=30)
+    save_bar(
+        label_counts,
+        "Class Distribution",
+        "Rows",
+        "Specialty",
+        FIGURES_DIR / "class_distribution.png",
+        top_n=30,
+    )
     plt.figure(figsize=(10, 6))
     plt.hist(working["char_len"], bins=60)
     plt.title("Text Length Distribution")
@@ -158,12 +207,32 @@ def run_eda() -> dict[str, object]:
     plt.tight_layout()
     plt.savefig(FIGURES_DIR / "text_length_distribution.png", dpi=160)
     plt.close()
-    save_bar(top_tokens, "Top Tokens", "Frequency", "Token", FIGURES_DIR / "top_tokens.png")
-    save_bar(missing_values[missing_values > 0] if (missing_values > 0).any() else pd.Series({"none": 0}), "Missing Values", "Missing Rows", "Column", FIGURES_DIR / "missing_values.png")
-    save_bar(language_counts, "Language Distribution", "Rows", "Language", FIGURES_DIR / "language_distribution.png")
+    save_bar(
+        top_tokens, "Top Tokens", "Frequency", "Token", FIGURES_DIR / "top_tokens.png"
+    )
+    save_bar(
+        missing_values[missing_values > 0]
+        if (missing_values > 0).any()
+        else pd.Series({"none": 0}),
+        "Missing Values",
+        "Missing Rows",
+        "Column",
+        FIGURES_DIR / "missing_values.png",
+    )
+    save_bar(
+        language_counts,
+        "Language Distribution",
+        "Rows",
+        "Language",
+        FIGURES_DIR / "language_distribution.png",
+    )
 
-    very_short = working.nsmallest(10, "char_len")[[text_col, "char_len", "language"]].to_dict("records")
-    very_long = working.nlargest(10, "char_len")[[text_col, "char_len", "language"]].to_dict("records")
+    very_short = working.nsmallest(10, "char_len")[
+        [text_col, "char_len", "language"]
+    ].to_dict("records")
+    very_long = working.nlargest(10, "char_len")[
+        [text_col, "char_len", "language"]
+    ].to_dict("records")
 
     summary = {
         "dataset_size": {"rows": int(len(working)), "columns": int(len(df.columns))},
@@ -190,7 +259,9 @@ def run_eda() -> dict[str, object]:
         "very_long_examples": very_long,
     }
 
-    (REPORTS_DIR / "eda_summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
+    (REPORTS_DIR / "eda_summary.json").write_text(
+        json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     write_markdown_report(summary)
     print(f"Saved figures to {FIGURES_DIR}")
     print(f"Saved EDA report to {REPORTS_DIR / 'eda_summary.md'}")
@@ -219,7 +290,9 @@ def write_markdown_report(summary: dict[str, object]) -> None:
         f"- Number of specialties: {summary['num_specialties']}",
         "- Most frequent specialties:",
     ]
-    lines.extend(f"  - {label}: {count}" for label, count in list(top_specialties.items())[:10])
+    lines.extend(
+        f"  - {label}: {count}" for label, count in list(top_specialties.items())[:10]
+    )
     lines.extend(
         [
             "",
@@ -238,7 +311,9 @@ def write_markdown_report(summary: dict[str, object]) -> None:
             "## Language and script observations",
         ]
     )
-    lines.extend(f"- {label}: {count}" for label, count in language_distribution.items())
+    lines.extend(
+        f"- {label}: {count}" for label, count in language_distribution.items()
+    )
     lines.extend(
         [
             "",
@@ -250,7 +325,9 @@ def write_markdown_report(summary: dict[str, object]) -> None:
             "- Add a small custom triage dataset because MedQA-MA provides specialty labels but not reliable urgency or symptom labels.",
         ]
     )
-    (REPORTS_DIR / "eda_summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    (REPORTS_DIR / "eda_summary.md").write_text(
+        "\n".join(lines) + "\n", encoding="utf-8"
+    )
 
 
 if __name__ == "__main__":
