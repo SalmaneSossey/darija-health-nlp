@@ -14,14 +14,28 @@ except ImportError:
 SYMPTOM_SPECIALTY_PRIORITY = [
     ("chest_pain", "Cardiology"),
     ("pregnancy_bleeding", "Obstetrics and Gynecology"),
+    ("bleeding", "Emergency Medicine"),
+    ("loss_of_consciousness", "Emergency Medicine"),
     ("skin_rash", "Dermatology"),
     ("stomach_pain", "Gastroenterology"),
     ("headache", "Neurology"),
     ("dizziness", "Neurology"),
-    ("fever", "General Practice"),
     ("cough", "Pulmonology"),
     ("shortness_of_breath", "Pulmonology"),
 ]
+CRITICAL_SYMPTOM_HINTS = {
+    "chest_pain",
+    "pregnancy_bleeding",
+    "bleeding",
+    "loss_of_consciousness",
+    "shortness_of_breath",
+}
+GENERAL_SPECIALTIES = {
+    "General Practice",
+    "Internal Medicine",
+    "general practitioner",
+}
+LOW_CONFIDENCE_THRESHOLD = 0.55
 
 
 class SpecialtyModel:
@@ -42,6 +56,7 @@ class SpecialtyModel:
                 "TRANSFORMER_PATH", models_dir / "transformer_MARBERT_specialty"
             )
         )
+        self.transformer_top_k = int(os.getenv("TRANSFORMER_TOP_K", "3"))
 
         self.load()
 
@@ -56,7 +71,7 @@ class SpecialtyModel:
             self.model = pipeline(
                 "text-classification",
                 model=str(self.transformer_path),
-                top_k=1,
+                top_k=max(1, self.transformer_top_k),
                 device=-1,
             )
             self.is_transformer = True
@@ -95,22 +110,24 @@ class SpecialtyModel:
 
     def predict(
         self, normalized_text: str, symptoms: list[str]
-    ) -> tuple[str, float | None]:
-        if symptoms:
-            for symptom, specialty in SYMPTOM_SPECIALTY_PRIORITY:
-                if symptom in symptoms:
-                    return specialty, None
+    ) -> tuple[str, float | None, list[dict[str, str | float]]]:
+        symptom_hint = self._symptom_specialty_hint(symptoms)
 
         # 1. Evaluate with Transformer (if active)
         if self.is_transformer and self.model is not None:
             outs = self.model(normalized_text)
-            best = outs[0][0] if isinstance(outs[0], list) else outs[0]
-            return best["label"], float(best["score"])
+            ranked = self._normalize_transformer_output(outs)
+            if ranked:
+                best = ranked[0]
+                label = str(best["label"])
+                score = float(best["score"])
+                label = self._apply_symptom_refinement(label, score, symptoms, symptom_hint)
+                return label, score, ranked
 
         # 2. Evaluate with compiled Rust classical engine (if active)
         if self.rust_classifier is not None:
             prediction = self.rust_classifier.predict(normalized_text)
-            return prediction, None
+            return self._apply_symptom_refinement(prediction, None, symptoms, symptom_hint), None, []
 
         # 3. Evaluate with standard Python Joblib engine (if active)
         if self.model is not None:
@@ -119,9 +136,50 @@ class SpecialtyModel:
             if hasattr(self.model, "predict_proba"):
                 probabilities = self.model.predict_proba([normalized_text])[0]
                 confidence = float(max(probabilities))
-            return prediction, confidence
+            return self._apply_symptom_refinement(prediction, confidence, symptoms, symptom_hint), confidence, []
 
-        return "General Practice", None
+        return symptom_hint or "General Practice", None, []
+
+    def _symptom_specialty_hint(self, symptoms: list[str]) -> str | None:
+        for symptom, specialty in SYMPTOM_SPECIALTY_PRIORITY:
+            if symptom in symptoms:
+                return specialty
+        return None
+
+    def _normalize_transformer_output(self, outs: Any) -> list[dict[str, str | float]]:
+        candidates = outs[0] if isinstance(outs, list) and outs and isinstance(outs[0], list) else outs
+        if isinstance(candidates, dict):
+            candidates = [candidates]
+        if not isinstance(candidates, list):
+            return []
+        ranked = [
+            {"label": str(item["label"]), "score": float(item["score"])}
+            for item in candidates
+            if isinstance(item, dict) and "label" in item and "score" in item
+        ]
+        return sorted(ranked, key=lambda item: float(item["score"]), reverse=True)
+
+    def _apply_symptom_refinement(
+        self,
+        predicted: str,
+        confidence: float | None,
+        symptoms: list[str],
+        symptom_hint: str | None,
+    ) -> str:
+        if symptom_hint is None:
+            return predicted
+        if not symptoms:
+            return predicted
+
+        low_confidence = confidence is None or confidence < LOW_CONFIDENCE_THRESHOLD
+        critical_signal = any(symptom in CRITICAL_SYMPTOM_HINTS for symptom in symptoms)
+        general_prediction = predicted in GENERAL_SPECIALTIES
+
+        if critical_signal and (low_confidence or general_prediction):
+            return symptom_hint
+        if low_confidence and predicted in GENERAL_SPECIALTIES:
+            return symptom_hint
+        return predicted
 
 
 specialty_model = SpecialtyModel()

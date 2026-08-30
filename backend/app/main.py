@@ -26,13 +26,14 @@ def health() -> dict[str, str]:
 def predict(request: PredictRequest) -> PredictResponse:
     normalized = normalize_text(request.message)
     symptoms = extract_symptoms(normalized)
-    specialty, confidence = specialty_model.predict(normalized, symptoms)
+    specialty, confidence, top_predictions = specialty_model.predict(normalized, symptoms)
     urgency = classify_urgency(normalized, symptoms)
     return PredictResponse(
         input_text=request.message,
         normalized_text=normalized,
         predicted_specialty=specialty,
         specialty_confidence=confidence,
+        top_predictions=top_predictions,
         urgency=urgency["urgency"],
         urgency_reason=urgency["reason"],
         symptoms=symptoms,

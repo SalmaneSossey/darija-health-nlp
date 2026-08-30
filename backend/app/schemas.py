@@ -12,6 +12,7 @@ class PredictResponse(BaseModel):
     normalized_text: str
     predicted_specialty: str
     specialty_confidence: float | None
+    top_predictions: list[dict[str, float | str]] = Field(default_factory=list)
     urgency: str
     urgency_reason: str
     symptoms: list[str]
