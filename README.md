@@ -143,6 +143,31 @@ python src/models/train_transformer_specialty_classifier.py --model arabert
 python src/models/train_transformer_specialty_classifier.py --model mbert
 ```
 
+For the V2.1 model-improvement sprint, generate dataset provenance before training:
+
+```bash
+python src/data/write_dataset_manifest.py
+```
+
+Class-weighted MARBERT can be trained on Kaggle GPU:
+
+```bash
+python src/models/train_transformer_specialty_classifier.py \
+  --model marbert \
+  --epochs 4 \
+  --batch-size 16 \
+  --max-length 160 \
+  --class-weighted
+```
+
+Create a Kaggle-ready package with:
+
+```bash
+python src/data/package_kaggle_training.py
+```
+
+See `docs/MODEL_IMPROVEMENT_V2_1.md` for the full workflow.
+
 For Colab, use:
 
 ```text
