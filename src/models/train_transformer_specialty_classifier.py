@@ -189,11 +189,14 @@ def train_transformer(
             def compute_loss(self, model: object, inputs: dict[str, object], return_outputs: bool = False, **kwargs: object) -> object:
                 labels = inputs.get("labels")
                 outputs = model(**inputs)
-                logits = outputs.get("logits")
+                logits = outputs["logits"] if isinstance(outputs, dict) else outputs.logits
+                model_config = getattr(model, "config", None)
+                if model_config is None and hasattr(model, "module"):
+                    model_config = model.module.config
                 loss_function = torch.nn.CrossEntropyLoss(
                     weight=torch.tensor(class_weights, dtype=torch.float, device=logits.device)
                 )
-                loss = loss_function(logits.view(-1, model.config.num_labels), labels.view(-1))
+                loss = loss_function(logits.view(-1, model_config.num_labels), labels.view(-1))
                 return (loss, outputs) if return_outputs else loss
 
         trainer_class = WeightedLossTrainer
